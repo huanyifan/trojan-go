@@ -12,19 +12,17 @@ on:
           - "1.22"
           - "1.23"
       upload_artifact:
-        description: "上传为 Artifact（不打 Release）"
+        description: "上传为 Artifact"
         required: true
         default: true
         type: boolean
 
   push:
-    tags:
-      - "v*"
-
-  push:
     branches:
       - master
       - dev
+    tags:
+      - "v*"
 
   pull_request:
     branches:
@@ -39,7 +37,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # ---------- Linux ----------
           - goos: linux
             goarch: amd64
             assetname: linux-64
@@ -86,16 +83,12 @@ jobs:
             goarch: mipsle
             gomips: hardfloat
             assetname: linux-mipsle-hardfloat
-
-          # ---------- macOS ----------
           - goos: darwin
             goarch: amd64
             assetname: macos-64
           - goos: darwin
             goarch: arm64
             assetname: macos-arm64
-
-          # ---------- Windows ----------
           - goos: windows
             goarch: amd64
             assetname: windows-64
@@ -105,8 +98,6 @@ jobs:
           - goos: windows
             goarch: arm64
             assetname: windows-arm64
-
-          # ---------- FreeBSD ----------
           - goos: freebsd
             goarch: amd64
             assetname: freebsd-64
@@ -116,6 +107,12 @@ jobs:
           - goos: freebsd
             goarch: arm64
             assetname: freebsd-arm64
+          - goos: openbsd
+            goarch: amd64
+            assetname: openbsd-64
+          - goos: openbsd
+            goarch: arm64
+            assetname: openbsd-arm64
 
     env:
       GOOS: ${{ matrix.goos }}
@@ -125,19 +122,19 @@ jobs:
       CGO_ENABLED: "0"
 
     steps:
-      - name: Checkout 代码
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 设置 Go
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: ${{ inputs.go_version || '1.22' }}
           check-latest: true
 
-      - name: 下载依赖
+      - name: Download deps
         run: go mod download
 
-      - name: 编译
+      - name: Build
         run: |
           BUILD_DIR="build/${{ matrix.assetname }}"
           mkdir -p "$BUILD_DIR"
@@ -149,7 +146,7 @@ jobs:
             -ldflags="-s -w -X $PACKAGE/constant.Version=$VERSION -X $PACKAGE/constant.Commit=$COMMIT" \
             -o "$BUILD_DIR/trojan-go${{ matrix.goos == 'windows' && '.exe' || '' }}" .
 
-      - name: 打包
+      - name: Package
         run: |
           BUILD_DIR="build/${{ matrix.assetname }}"
           PKG_NAME="trojan-go-${{ matrix.assetname }}"
@@ -161,13 +158,13 @@ jobs:
             tar czf "../${PKG_NAME}.tar.gz" ./*
           fi
 
-      - name: 上传为 Artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: trojan-go-${{ matrix.assetname }}
           path: ./trojan-go-${{ matrix.assetname }}.*
 
-      - name: 上传到 Release（tag 触发时）
+      - name: Upload Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: svenstaro/upload-release-action@v2
         with:
