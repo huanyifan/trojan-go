@@ -31,88 +31,87 @@ on:
 
 jobs:
   build:
-    name: 编译 ${{ matrix.goos }}-${{ matrix.goarch }}
+    name: ${{ matrix.goos }}-${{ matrix.goarch }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
+          # ======== Linux ========
           - goos: linux
             goarch: amd64
-            assetname: linux-64
+            ext: ""
           - goos: linux
             goarch: "386"
-            assetname: linux-32
+            ext: ""
           - goos: linux
             goarch: arm64
-            assetname: linux-arm64-v8a
+            ext: ""
           - goos: linux
             goarch: arm
             goarm: "7"
-            assetname: linux-armv7l
+            ext: ""
           - goos: linux
             goarch: arm
             goarm: "6"
-            assetname: linux-armv6l
+            ext: ""
           - goos: linux
             goarch: arm
             goarm: "5"
-            assetname: linux-armv5l
-          - goos: linux
-            goarch: riscv64
-            assetname: linux-riscv64
+            ext: ""
           - goos: linux
             goarch: mips64
-            assetname: linux-mips64
+            ext: ""
           - goos: linux
             goarch: mips64le
-            assetname: linux-mips64le
+            ext: ""
           - goos: linux
             goarch: mips
             gomips: softfloat
-            assetname: linux-mips-softfloat
+            ext: ""
           - goos: linux
             goarch: mips
             gomips: hardfloat
-            assetname: linux-mips-hardfloat
+            ext: ""
           - goos: linux
             goarch: mipsle
             gomips: softfloat
-            assetname: linux-mipsle-softfloat
+            ext: ""
           - goos: linux
             goarch: mipsle
             gomips: hardfloat
-            assetname: linux-mipsle-hardfloat
+            ext: ""
+          # ======== macOS ========
           - goos: darwin
             goarch: amd64
-            assetname: macos-64
+            ext: ""
           - goos: darwin
             goarch: arm64
-            assetname: macos-arm64
+            ext: ""
+          # ======== Windows ========
           - goos: windows
             goarch: amd64
-            assetname: windows-64
+            ext: ".exe"
           - goos: windows
             goarch: "386"
-            assetname: windows-32
-          - goos: windows
-            goarch: arm64
-            assetname: windows-arm64
+            ext: ".exe"
+          # ======== FreeBSD ========
           - goos: freebsd
             goarch: amd64
-            assetname: freebsd-64
+            ext: ""
           - goos: freebsd
             goarch: "386"
-            assetname: freebsd-32
+            ext: ""
           - goos: freebsd
             goarch: arm64
-            assetname: freebsd-arm64
+            ext: ""
+          # ======== OpenBSD ========
           - goos: openbsd
             goarch: amd64
-            assetname: openbsd-64
+            ext: ""
           - goos: openbsd
             goarch: arm64
-            assetname: openbsd-arm64
+            ext: ""
 
     env:
       GOOS: ${{ matrix.goos }}
@@ -136,7 +135,9 @@ jobs:
 
       - name: Build
         run: |
-          BUILD_DIR="build/${{ matrix.assetname }}"
+          ASSET="trojan-go-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goarm && format('-arm{0}', matrix.goarm) || '' }}${{ matrix.gomips && format('-{0}', matrix.gomips) || '' }}"
+          echo "ASSET=$ASSET" >> $GITHUB_ENV
+          BUILD_DIR="build/$ASSET"
           mkdir -p "$BUILD_DIR"
           PACKAGE="github.com/p4gefau1t/trojan-go"
           VERSION="${GITHUB_REF_NAME:-dev}"
@@ -144,12 +145,12 @@ jobs:
           go build -tags "full" \
             -trimpath \
             -ldflags="-s -w -X $PACKAGE/constant.Version=$VERSION -X $PACKAGE/constant.Commit=$COMMIT" \
-            -o "$BUILD_DIR/trojan-go${{ matrix.goos == 'windows' && '.exe' || '' }}" .
+            -o "$BUILD_DIR/trojan-go${{ matrix.ext }}" .
 
       - name: Package
         run: |
-          BUILD_DIR="build/${{ matrix.assetname }}"
-          PKG_NAME="trojan-go-${{ matrix.assetname }}"
+          BUILD_DIR="build/${{ env.ASSET }}"
+          PKG_NAME="${{ env.ASSET }}"
           cp README.md LICENSE "$BUILD_DIR/"
           cd "$BUILD_DIR"
           if [ "${{ matrix.goos }}" = "windows" ]; then
@@ -161,15 +162,15 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: trojan-go-${{ matrix.assetname }}
-          path: ./trojan-go-${{ matrix.assetname }}.*
+          name: ${{ env.ASSET }}
+          path: ./${{ env.ASSET }}.*
 
       - name: Upload Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./trojan-go-${{ matrix.assetname }}.*
+          file: ./${{ env.ASSET }}.*
           file_glob: true
           tag: ${{ github.ref }}
           overwrite: true
